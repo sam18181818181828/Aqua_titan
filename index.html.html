@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AQUA TITANS | ESP32 Water Purification Schematic – SIH 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #12181f;
+      --card: #1a222d;
+      --border: #2a3544;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --safe: #22c55e;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --pipe-dirty: #eab308;
+      --pipe-clean: #22d3ee;
+      --pipe-off: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.45;
+    }
+    header {
+      background: linear-gradient(90deg, #0f172a, #1e293b);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .logo-area { display: flex; align-items: center; gap: 12px; }
+    .logo-circle {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: rgba(56,189,248,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.35rem; border: 1px solid rgba(56,189,248,0.35);
+    }
+    .logo-text h1 { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; }
+    .logo-text p { font-size: 0.72rem; color: var(--muted); }
+    .sih-badge {
+      background: rgba(56,189,248,0.12);
+      border: 1px solid rgba(56,189,248,0.3);
+      padding: 5px 12px; border-radius: 16px;
+      font-size: 0.78rem; font-weight: 600; color: var(--accent);
+    }
+    .header-btns { display: flex; gap: 8px; }
+    .icon-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--text); font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .icon-btn:hover { background: #243044; border-color: var(--accent); }
+    .icon-btn.playing { background: rgba(34,197,94,0.2); border-color: var(--safe); color: var(--safe); }
+    .container { max-width: 1200px; margin: 0 auto; padding: 1.25rem; }
+
+    .schematic-wrap {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem 1.25rem 1.25rem;
+      margin-bottom: 1.25rem;
+      position: relative;
+    }
+    .schematic-title {
+      text-align: center;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 1.25rem;
+    }
+
+    .mcu-panel {
+      position: absolute;
+      top: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0c1220;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      z-index: 10;
+      min-width: 165px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .mcu-panel .mcu-title {
+      color: var(--muted);
+      font-size: 0.65rem;
+      text-align: center;
+      margin-bottom: 4px;
+      letter-spacing: 1px;
+    }
+    .mcu-line { display: flex; justify-content: space-between; gap: 12px; }
+    .mcu-line .val { color: #f1f5f9; }
+    .mcu-line .pass { color: var(--safe); font-weight: 700; }
+    .mcu-line .fail { color: var(--danger); font-weight: 700; }
+
+    .schematic-svg {
+      width: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+      display: block;
+      overflow: visible;
+    }
+
+    /* Animated dash for flowing water */
+    .flow-dash {
+      stroke-dasharray: 12 10;
+      animation: flowDash 0.7s linear infinite;
+    }
+    .flow-dash-slow {
+      stroke-dasharray: 14 12;
+      animation: flowDash 1.1s linear infinite;
+    }
+    @keyframes flowDash {
+      to { stroke-dashoffset: -22; }
+    }
+
+    .readouts {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-top: 1.1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .readout { text-align: center; }
+    .readout .label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 2px;
+    }
+    .readout .value { font-size: 1.3rem; font-weight: 700; }
+    .readout .value.ok { color: var(--safe); }
+    .readout .value.bad { color: var(--danger); }
+    .readout .value.neutral { color: var(--accent); }
+    .readout-divider { width: 1px; background: var(--border); align-self: stretch; }
+
+    .sliders-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .slider-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 70px;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .slider-row:last-child { margin-bottom: 0; }
+    .slider-label { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 6px;
+      background: #334155; border-radius: 3px; outline: none; cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #f1f5f9; border: 2px solid var(--accent); cursor: pointer;
+      box-shadow: 0 0 8px rgba(56,189,248,0.4);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #f1f5f9; border: 2px solid var(--accent); cursor: pointer;
+    }
+    .slider-val {
+      background: #0c1220; border: 1px solid var(--border);
+      border-radius: 8px; padding: 6px 10px; text-align: center;
+      font-weight: 700; font-size: 0.95rem; color: #f1f5f9;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 0.6rem;
+      margin-bottom: 1.25rem; justify-content: center;
+    }
+    button.action {
+      border: none; border-radius: 10px;
+      padding: 0.65rem 1.2rem; font-weight: 600;
+      font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    button.action:active { transform: scale(0.97); }
+    .btn-play { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; }
+    .btn-play:hover { filter: brightness(1.1); }
+    .btn-purify { background: linear-gradient(135deg, #059669, #10b981); color: white; }
+    .btn-contam { background: linear-gradient(135deg, #dc2626, #ef4444); color: white; }
+    .btn-reset { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+    .btn-reset:hover { border-color: var(--accent); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 1.25rem;
+    }
+    @media (max-width: 900px) {
+      .bottom-grid { grid-template-columns: 1fr; }
+      .mcu-panel { position: relative; top: auto; left: auto; transform: none; margin: 0 auto 1rem; }
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .card-h {
+      background: #0f172a;
+      padding: 0.7rem 1rem;
+      font-weight: 600;
+      font-size: 0.88rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-b { padding: 1rem; }
+
+    .stage-list { display: flex; flex-direction: column; gap: 0.45rem; }
+    .stage-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0.55rem 0.7rem;
+      background: var(--card);
+      border-radius: 10px;
+      border: 1px solid transparent;
+      transition: all 0.3s;
+    }
+    .stage-item.active {
+      border-color: var(--accent);
+      background: rgba(56,189,248,0.08);
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.2);
+    }
+    .stage-item.done {
+      border-color: var(--safe);
+      background: rgba(34,197,94,0.08);
+    }
+    .stage-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #334155; color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 700; flex-shrink: 0;
+    }
+    .stage-item.active .stage-num { background: var(--accent); color: #0f172a; }
+    .stage-item.done .stage-num { background: var(--safe); color: #0f172a; }
+    .stage-info h4 { font-size: 0.82rem; font-weight: 600; }
+    .stage-info p { font-size: 0.68rem; color: var(--muted); }
+
+    .tg-box { max-height: 200px; overflow-y: auto; }
+    .tg-msg {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 0.55rem 0.75rem;
+      margin-bottom: 0.45rem;
+      font-size: 0.78rem;
+      border-left: 3px solid var(--accent);
+      animation: fadeIn 0.3s ease;
+    }
+    .tg-msg.alert { border-left-color: var(--danger); }
+    .tg-head {
+      display: flex; justify-content: space-between;
+      font-size: 0.72rem; color: var(--accent);
+      font-weight: 600; margin-bottom: 2px;
+    }
+    .tg-time { color: var(--muted); font-weight: 400; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chart-box { height: 180px; }
+    .stats { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
+    .stat {
+      background: var(--card);
+      padding: 0.3rem 0.65rem;
+      border-radius: 16px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .stat span { color: var(--accent); }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+    footer strong { color: var(--accent); }
+
+    /* Water droplet falling animation at tap */
+    @keyframes dropFall {
+      0% { opacity: 0; transform: translateY(-4px); }
+      30% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(14px); }
+    }
+    .dropping {
+      animation: dropFall 0.9s ease-in infinite;
+    }
+
+    /* Tank water wave */
+    @keyframes waveY {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-area">
+      <div class="logo-circle">💧</div>
+      <div class="logo-text">
+        <h1>AQUA TITANS</h1>
+        <p>ESP32 Water Purification Schematic · SIH 2026</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="sih-badge">🏆 Smart India Hackathon 2026</div>
+      <div class="header-btns">
+        <button class="icon-btn" id="playBtn" onclick="toggleSim()" title="Play / Pause">▶</button>
+        <button class="icon-btn" onclick="resetAll()" title="Reset">↻</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="schematic-wrap">
+      <div class="schematic-title">ESP32 Water Purification Schematic</div>
+
+      <div class="mcu-panel" id="mcuPanel">
+        <div class="mcu-title">ESP32 MCU</div>
+        <div class="mcu-line">
+          <span>TURB:</span>
+          <span><span class="val" id="mcuTurb">1.8</span> <span id="mcuTurbStatus" class="pass">PASS</span></span>
+        </div>
+        <div class="mcu-line">
+          <span>pH :</span>
+          <span><span class="val" id="mcuPh">7.2</span> <span id="mcuPhStatus" class="pass">PASS</span></span>
+        </div>
+        <div class="mcu-line">
+          <span>TDS :</span>
+          <span><span class="val" id="mcuTds">180</span> <span id="mcuTdsStatus" class="pass">PASS</span></span>
+        </div>
+      </div>
+
+      <svg class="schematic-svg" viewBox="0 0 920 340" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="dirtyGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ca8a04"/>
+            <stop offset="100%" stop-color="#854d0e"/>
+          </linearGradient>
+          <linearGradient id="cleanGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#67e8f9"/>
+            <stop offset="100%" stop-color="#0891b2"/>
+          </linearGradient>
+          <!-- Moving water pattern -->
+          <pattern id="flowPatternDirty" patternUnits="userSpaceOnUse" width="24" height="10" patternTransform="rotate(0)">
+            <rect width="24" height="10" fill="#eab308"/>
+            <rect width="10" height="10" fill="#fbbf24" opacity="0.7">
+              <animate attributeName="x" from="-10" to="24" dur="0.6s" repeatCount="indefinite"/>
+            </rect>
+          </pattern>
+          <pattern id="flowPatternClean" patternUnits="userSpaceOnUse" width="24" height="10">
+            <rect width="24" height="10" fill="#22d3ee"/>
+            <rect width="10" height="10" fill="#67e8f9" opacity="0.8">
+              <animate attributeName="x" from="-10" to="24" dur="0.5s" repeatCount="indefinite"/>
+            </rect>
+          </pattern>
+        </defs>
+
+        <!-- ========== INLET TANK ========== -->
+        <rect x="28" y="95" width="78" height="110" rx="5" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
+        <!-- Water fill -->
+        <clipPath id="tankClip">
+          <rect x="32" y="99" width="70" height="102" rx="3"/>
+        </clipPath>
+        <g clip-path="url(#tankClip)">
+          <rect id="inletFill" x="32" y="130" width="70" height="75" fill="url(#dirtyGrad)"/>
+          <!-- Wave surface -->
+          <ellipse id="tankWave" cx="67" cy="130" rx="38" ry="6" fill="#ca8a04" opacity="0.5">
+            <animate attributeName="cy" values="128;132;128" dur="1.8s" repeatCount="indefinite"/>
+          </ellipse>
+        </g>
+        <text x="67" y="225" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="600">INLET TANK</text>
+        <!-- Flow indicator dots rising in tank when running -->
+        <g id="tankBubbles" opacity="0">
+          <circle cx="50" cy="180" r="2.5" fill="#fde68a" opacity="0.7">
+            <animate attributeName="cy" values="195;120" dur="1.4s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.8;0" dur="1.4s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="70" cy="190" r="2" fill="#fde68a" opacity="0.6">
+            <animate attributeName="cy" values="200;125" dur="1.7s" begin="0.3s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.7;0" dur="1.7s" begin="0.3s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="58" cy="185" r="1.8" fill="#fde68a" opacity="0.5">
+            <animate attributeName="cy" values="198;122" dur="1.5s" begin="0.6s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.6;0" dur="1.5s" begin="0.6s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+
+        <!-- ========== PIPES: Tank → Sensors (top) ========== -->
+        <!-- Base pipe (always visible) -->
+        <path d="M106 145 H185 L225 78 H385" fill="none" stroke="#334155" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Animated flow layer -->
+        <path id="flowTop" class="" d="M106 145 H185 L225 78 H385" fill="none" stroke="#eab308" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0"/>
+
+        <!-- SENSORS box -->
+        <rect x="205" y="52" width="95" height="42" rx="5" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+        <circle cx="225" cy="68" r="5.5" fill="#f59e0b"/>
+        <circle cx="252" cy="68" r="5.5" fill="#f59e0b"/>
+        <circle cx="279" cy="68" r="5.5" fill="#f59e0b"/>
+        <!-- Sensor pulse when running -->
+        <circle id="sensorPulse" cx="252" cy="68" r="8" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0">
+          <animate attributeName="r" values="6;12;6" dur="1.2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.6;0;0.6" dur="1.2s" repeatCount="indefinite"/>
+        </circle>
+        <text x="252" y="88" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="600">SENSORS</text>
+
+        <!-- Pipe sensors → diverter -->
+        <path d="M300 73 H425" fill="none" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+        <path id="flowToDiv" d="M300 73 H425" fill="none" stroke="#eab308" stroke-width="5" stroke-linecap="round" opacity="0"/>
+
+        <!-- ========== DIVERTER ========== -->
+        <circle id="diverter" cx="445" cy="73" r="16" fill="#1e293b" stroke="#eab308" stroke-width="3"/>
+        <line id="divGate" x1="445" y1="57" x2="445" y2="89" stroke="#38bdf8" stroke-width="3.5" stroke-linecap="round"/>
+        <text x="445" y="112" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="600">DIVERTER</text>
+
+        <!-- Clean path (diverter → clean tap) -->
+        <path d="M461 73 H720" fill="none" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+        <path id="flowClean" d="M461 73 H720" fill="none" stroke="#22d3ee" stroke-width="5" stroke-linecap="round" opacity="0"/>
+
+        <!-- ========== CLEAN TAP ========== -->
+        <rect x="725" y="52" width="32" height="20" rx="3" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+        <rect x="732" y="72" width="18" height="24" rx="2" fill="none" stroke="#64748b" stroke-width="1.5"/>
+        <text x="741" y="118" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="600">CLEAN TAP</text>
+        <!-- Animated water drops -->
+        <g id="tapDrops" opacity="0">
+          <ellipse cx="741" cy="100" rx="3.5" ry="5" fill="#22d3ee">
+            <animate attributeName="cy" values="95;118" dur="0.85s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="1;0" dur="0.85s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="741" cy="100" rx="3" ry="4.5" fill="#67e8f9">
+            <animate attributeName="cy" values="95;118" dur="0.85s" begin="0.28s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="1;0" dur="0.85s" begin="0.28s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="741" cy="100" rx="3.2" ry="4.8" fill="#22d3ee">
+            <animate attributeName="cy" values="95;118" dur="0.85s" begin="0.55s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="1;0" dur="0.85s" begin="0.55s" repeatCount="indefinite"/>
+          </ellipse>
+        </g>
+
+        <!-- Down pipe from diverter to purification line -->
+        <path d="M445 89 V168" fill="none" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+        <path id="flowDown" d="M445 89 V168" fill="none" stroke="#eab308" stroke-width="5" stroke-linecap="round" opacity="0"/>
+
+        <!-- Tank bottom → purification line -->
+        <path d="M67 205 V185 H140" fill="none" stroke="#334155" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path id="flowTankBottom" d="M67 205 V185 H140" fill="none" stroke="#eab308" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0"/>
+
+        <!-- ========== PURIFICATION STAGES ========== -->
+        <!-- Stage 1 Sediment -->
+        <g id="stageSediment">
+          <rect x="145" y="167" width="72" height="38" rx="5" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+          <text x="181" y="190" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">Sediment</text>
+        </g>
+        <path d="M217 186 H238" fill="none" stroke="#334155" stroke-width="8"/>
+        <path id="flowP1" d="M217 186 H238" fill="none" stroke="#eab308" stroke-width="5" opacity="0"/>
+
+        <!-- Stage 2 Carbon -->
+        <g id="stageCarbon">
+          <rect x="238" y="167" width="72" height="38" rx="5" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+          <text x="274" y="190" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">Carbon</text>
+        </g>
+        <path d="M310 186 H331" fill="none" stroke="#334155" stroke-width="8"/>
+        <path id="flowP2" d="M310 186 H331" fill="none" stroke="#eab308" stroke-width="5" opacity="0"/>
+
+        <!-- Stage 3 UF -->
+        <g id="stageUF">
+          <rect x="331" y="167" width="72" height="38" rx="5" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+          <text x="367" y="190" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">UF Filter</text>
+        </g>
+        <path d="M403 186 H424" fill="none" stroke="#334155" stroke-width="8"/>
+        <path id="flowP3" d="M403 186 H424" fill="none" stroke="#eab308" stroke-width="5" opacity="0"/>
+
+        <!-- Stage 4 UV -->
+        <g id="stageUV">
+          <rect x="424" y="167" width="72" height="38" rx="5" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+          <text x="460" y="190" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">UV Lamp</text>
+        </g>
+        <path d="M496 186 H517" fill="none" stroke="#334155" stroke-width="8"/>
+        <path id="flowP4" d="M496 186 H517" fill="none" stroke="#eab308" stroke-width="5" opacity="0"/>
+
+        <!-- Stage 5 Desalin -->
+        <g id="stageDesalin">
+          <rect x="517" y="167" width="72" height="38" rx="5" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+          <text x="553" y="190" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">Desalin.</text>
+        </g>
+
+        <!-- Back up to clean path -->
+        <path d="M589 186 H640 V73" fill="none" stroke="#334155" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path id="flowBack" d="M589 186 H640 V73" fill="none" stroke="#22d3ee" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0"/>
+
+        <!-- Labels -->
+        <text x="370" y="255" text-anchor="middle" fill="#475569" font-size="11">⟵ Purification path (when contaminated)</text>
+        <text x="600" y="45" text-anchor="middle" fill="#475569" font-size="11">Clean path (when safe) →</text>
+
+        <!-- Running indicator badge -->
+        <g id="runningBadge" opacity="0">
+          <rect x="780" y="300" width="110" height="26" rx="13" fill="#14532d" stroke="#22c55e" stroke-width="1"/>
+          <circle cx="798" cy="313" r="5" fill="#22c55e">
+            <animate attributeName="opacity" values="1;0.3;1" dur="0.8s" repeatCount="indefinite"/>
+          </circle>
+          <text x="830" y="317" fill="#86efac" font-size="11" font-weight="600">WATER FLOWING</text>
+        </g>
+      </svg>
+
+      <div class="readouts">
+        <div class="readout">
+          <div class="label">Turbidity</div>
+          <div class="value neutral" id="readTurb">1.8 NTU</div>
+        </div>
+        <div class="readout-divider"></div>
+        <div class="readout">
+          <div class="label">pH</div>
+          <div class="value neutral" id="readPh">7.2</div>
+        </div>
+        <div class="readout-divider"></div>
+        <div class="readout">
+          <div class="label">TDS</div>
+          <div class="value neutral" id="readTds">180 ppm</div>
+        </div>
+        <div class="readout-divider"></div>
+        <div class="readout">
+          <div class="label">Status</div>
+          <div class="value ok" id="readStatus">Safe</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sliders-panel">
+      <div class="slider-row">
+        <div class="slider-label">Turbidity (NTU)</div>
+        <input type="range" id="sliderTurb" min="0" max="30" step="0.1" value="1.8" oninput="onSliderChange()"/>
+        <div class="slider-val" id="valTurb">1.8</div>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">pH Level</div>
+        <input type="range" id="sliderPh" min="4" max="10" step="0.1" value="7.2" oninput="onSliderChange()"/>
+        <div class="slider-val" id="valPh">7.2</div>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">TDS (ppm)</div>
+        <input type="range" id="sliderTds" min="0" max="1000" step="5" value="180" oninput="onSliderChange()"/>
+        <div class="slider-val" id="valTds">180</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="action btn-play" id="btnSim" onclick="toggleSim()">▶ Start Simulation</button>
+      <button class="action btn-purify" id="btnPurify" onclick="runPurification()" disabled>🔄 Run Purification</button>
+      <button class="action btn-contam" onclick="injectContam()">⚠ Inject Contaminated</button>
+      <button class="action btn-reset" onclick="resetAll()">↻ Reset</button>
+    </div>
+
+    <div class="bottom-grid">
+      <div>
+        <div class="card" style="margin-bottom:1.25rem;">
+          <div class="card-h">🔬 Purification Stages</div>
+          <div class="card-b">
+            <div class="stage-list">
+              <div class="stage-item" id="si1">
+                <div class="stage-num">1</div>
+                <div class="stage-info"><h4>Sediment Filter</h4><p>Removes sand, rust, large particles</p></div>
+              </div>
+              <div class="stage-item" id="si2">
+                <div class="stage-num">2</div>
+                <div class="stage-info"><h4>Activated Carbon</h4><p>Removes chlorine, chemicals, odour</p></div>
+              </div>
+              <div class="stage-item" id="si3">
+                <div class="stage-num">3</div>
+                <div class="stage-info"><h4>UF Filter</h4><p>Ultra-filtration — bacteria & cysts</p></div>
+              </div>
+              <div class="stage-item" id="si4">
+                <div class="stage-num">4</div>
+                <div class="stage-info"><h4>UV Lamp</h4><p>Destroys viruses & pathogens</p></div>
+              </div>
+              <div class="stage-item" id="si5">
+                <div class="stage-num">5</div>
+                <div class="stage-info"><h4>Desalination</h4><p>Reduces dissolved salts (TDS)</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h">📈 Quality Trend</div>
+          <div class="card-b">
+            <div class="chart-box"><canvas id="chart"></canvas></div>
+            <div class="stats">
+              <div class="stat">Safe: <span id="statSafe">—</span></div>
+              <div class="stat">Samples: <span id="statSamples">0</span></div>
+              <div class="stat">Alerts: <span id="statAlerts">0</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:1.25rem;">
+          <div class="card-h">📱 Telegram Alerts</div>
+          <div class="card-b">
+            <div class="tg-box" id="tgBox">
+              <div class="tg-msg">
+                <div class="tg-head"><span>🤖 AquaTitans Bot</span><span class="tg-time">now</span></div>
+                System ready. Adjust sliders or start simulation.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h">📋 Safe Limits (WHO/BIS)</div>
+          <div class="card-b" style="font-size:0.82rem;">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+              <span>Turbidity</span><span style="color:var(--muted);">&lt; 5 NTU</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+              <span>pH</span><span style="color:var(--muted);">6.5 – 8.5</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;">
+              <span>TDS</span><span style="color:var(--muted);">&lt; 500 ppm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <strong>AQUA TITANS</strong> — ESP32-Based IoT Water Purification & Quality Monitoring<br>
+    Smart India Hackathon 2026 · Interactive Schematic Simulator
+  </footer>
+
+  <script>
+    const LIMITS = { turb: 5, phMin: 6.5, phMax: 8.5, tds: 500 };
+    let turb = 1.8, ph = 7.2, tds = 180;
+    let running = false, purifying = false, intervalId = null;
+    let samples = 0, alerts = 0, safeCount = 0;
+    let chart = null;
+    let hist = { labels: [], turb: [], ph: [], tds: [] };
+
+    function isSafe() {
+      return turb <= LIMITS.turb && ph >= LIMITS.phMin && ph <= LIMITS.phMax && tds <= LIMITS.tds;
+    }
+
+    // Turn flow animation on/off for a path element
+    function setFlow(id, on, clean) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (on) {
+        el.setAttribute('opacity', '1');
+        el.setAttribute('class', 'flow-dash');
+        el.setAttribute('stroke', clean ? '#22d3ee' : '#eab308');
+      } else {
+        el.setAttribute('opacity', '0');
+        el.removeAttribute('class');
+      }
+    }
+
+    function updateAll() {
+      document.getElementById('valTurb').textContent = turb.toFixed(1);
+      document.getElementById('valPh').textContent = ph.toFixed(1);
+      document.getElementById('valTds').textContent = Math.round(tds);
+
+      document.getElementById('mcuTurb').textContent = turb.toFixed(1);
+      document.getElementById('mcuPh').textContent = ph.toFixed(1);
+      document.getElementById('mcuTds').textContent = Math.round(tds);
+
+      const turbOk = turb <= LIMITS.turb;
+      const phOk = ph >= LIMITS.phMin && ph <= LIMITS.phMax;
+      const tdsOk = tds <= LIMITS.tds;
+
+      const tStat = document.getElementById('mcuTurbStatus');
+      tStat.textContent = turbOk ? 'PASS' : 'FAIL';
+      tStat.className = turbOk ? 'pass' : 'fail';
+
+      const pStat = document.getElementById('mcuPhStatus');
+      pStat.textContent = phOk ? 'PASS' : 'FAIL';
+      pStat.className = phOk ? 'pass' : 'fail';
+
+      const dStat = document.getElementById('mcuTdsStatus');
+      dStat.textContent = tdsOk ? 'PASS' : 'FAIL';
+      dStat.className = tdsOk ? 'pass' : 'fail';
+
+      const rTurb = document.getElementById('readTurb');
+      rTurb.textContent = turb.toFixed(1) + ' NTU';
+      rTurb.className = 'value ' + (turbOk ? 'ok' : 'bad');
+
+      const rPh = document.getElementById('readPh');
+      rPh.textContent = ph.toFixed(1);
+      rPh.className = 'value ' + (phOk ? 'ok' : 'bad');
+
+      const rTds = document.getElementById('readTds');
+      rTds.textContent = Math.round(tds) + ' ppm';
+      rTds.className = 'value ' + (tdsOk ? 'ok' : 'bad');
+
+      const rStatus = document.getElementById('readStatus');
+      if (purifying) {
+        rStatus.textContent = 'Purifying...';
+        rStatus.className = 'value neutral';
+      } else if (isSafe()) {
+        rStatus.textContent = 'Safe';
+        rStatus.className = 'value ok';
+      } else {
+        rStatus.textContent = 'Contaminated';
+        rStatus.className = 'value bad';
+      }
+
+      // Inlet tank
+      const fill = document.getElementById('inletFill');
+      const wave = document.getElementById('tankWave');
+      if (isSafe()) {
+        fill.setAttribute('fill', 'url(#cleanGrad)');
+        fill.setAttribute('y', '145');
+        fill.setAttribute('height', '60');
+        wave.setAttribute('fill', '#22d3ee');
+        wave.setAttribute('cy', '145');
+      } else {
+        fill.setAttribute('fill', 'url(#dirtyGrad)');
+        fill.setAttribute('y', '120');
+        fill.setAttribute('height', '85');
+        wave.setAttribute('fill', '#ca8a04');
+        wave.setAttribute('cy', '120');
+      }
+
+      updatePipesAndFlow();
+
+      document.getElementById('statSamples').textContent = samples;
+      document.getElementById('statAlerts').textContent = alerts;
+      document.getElementById('statSafe').textContent = samples ? Math.round(safeCount / samples * 100) + '%' : '—';
+    }
+
+    function updatePipesAndFlow() {
+      const safe = isSafe() && !purifying;
+      const divGate = document.getElementById('divGate');
+      const diverter = document.getElementById('diverter');
+      const tapDrops = document.getElementById('tapDrops');
+      const tankBubbles = document.getElementById('tankBubbles');
+      const sensorPulse = document.getElementById('sensorPulse');
+      const runningBadge = document.getElementById('runningBadge');
+
+      // Show running indicators when sim is on
+      const isActive = running || purifying;
+      tankBubbles.setAttribute('opacity', isActive ? '1' : '0');
+      sensorPulse.setAttribute('opacity', isActive ? '1' : '0');
+      runningBadge.setAttribute('opacity', isActive ? '1' : '0');
+
+      if (purifying) {
+        // Water runs through purification path
+        setFlow('flowTop', true, false);
+        setFlow('flowToDiv', true, false);
+        setFlow('flowDown', true, false);
+        setFlow('flowTankBottom', true, false);
+        setFlow('flowP1', true, false);
+        setFlow('flowP2', true, false);
+        setFlow('flowP3', true, false);
+        setFlow('flowP4', true, false);
+        setFlow('flowBack', true, true);
+        setFlow('flowClean', false);
+        divGate.setAttribute('transform', 'rotate(90 445 73)');
+        diverter.setAttribute('stroke', '#eab308');
+        tapDrops.setAttribute('opacity', '0');
+      } else if (safe && running) {
+        // Safe: water flows straight to clean tap
+        setFlow('flowTop', true, false);
+        setFlow('flowToDiv', true, false);
+        setFlow('flowClean', true, true);
+        setFlow('flowDown', false);
+        setFlow('flowTankBottom', false);
+        setFlow('flowP1', false);
+        setFlow('flowP2', false);
+        setFlow('flowP3', false);
+        setFlow('flowP4', false);
+        setFlow('flowBack', false);
+        divGate.setAttribute('transform', 'rotate(0 445 73)');
+        diverter.setAttribute('stroke', '#22d3ee');
+        tapDrops.setAttribute('opacity', '1');
+      } else if (!safe && !purifying) {
+        // Contaminated, waiting
+        setFlow('flowTop', running, false);
+        setFlow('flowToDiv', running, false);
+        setFlow('flowClean', false);
+        setFlow('flowDown', false);
+        setFlow('flowTankBottom', false);
+        setFlow('flowP1', false);
+        setFlow('flowP2', false);
+        setFlow('flowP3', false);
+        setFlow('flowP4', false);
+        setFlow('flowBack', false);
+        divGate.setAttribute('transform', 'rotate(45 445 73)');
+        diverter.setAttribute('stroke', '#ef4444');
+        tapDrops.setAttribute('opacity', '0');
+      } else {
+        // Idle
+        setFlow('flowTop', false);
+        setFlow('flowToDiv', false);
+        setFlow('flowClean', false);
+        setFlow('flowDown', false);
+        setFlow('flowTankBottom', false);
+        setFlow('flowP1', false);
+        setFlow('flowP2', false);
+        setFlow('flowP3', false);
+        setFlow('flowP4', false);
+        setFlow('flowBack', false);
+        divGate.setAttribute('transform', 'rotate(0 445 73)');
+        diverter.setAttribute('stroke', '#64748b');
+        tapDrops.setAttribute('opacity', '0');
+      }
+    }
+
+    function setStageActive(n) {
+      for (let i = 1; i <= 5; i++) {
+        const el = document.getElementById('si' + i);
+        if (i < n) el.className = 'stage-item done';
+        else if (i === n) el.className = 'stage-item active';
+        else el.className = 'stage-item';
+      }
+      const ids = ['stageSediment', 'stageCarbon', 'stageUF', 'stageUV', 'stageDesalin'];
+      ids.forEach((id, idx) => {
+        const rect = document.getElementById(id).querySelector('rect');
+        if (idx + 1 < n) {
+          rect.setAttribute('stroke', '#22c55e');
+          rect.setAttribute('fill', '#14532d');
+        } else if (idx + 1 === n) {
+          rect.setAttribute('stroke', '#38bdf8');
+          rect.setAttribute('fill', '#0c4a6e');
+        } else {
+          rect.setAttribute('stroke', '#64748b');
+          rect.setAttribute('fill', '#1e293b');
+        }
+      });
+    }
+
+    function onSliderChange() {
+      turb = parseFloat(document.getElementById('sliderTurb').value);
+      ph = parseFloat(document.getElementById('sliderPh').value);
+      tds = parseFloat(document.getElementById('sliderTds').value);
+      updateAll();
+    }
+
+    function tg(msg, isAlert) {
+      const box = document.getElementById('tgBox');
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const div = document.createElement('div');
+      div.className = 'tg-msg' + (isAlert ? ' alert' : '');
+      div.innerHTML = '<div class="tg-head"><span>🤖 AquaTitans Bot</span><span class="tg-time">' + time + '</span></div>' + (isAlert ? '🚨 ' : '') + msg;
+      box.prepend(div);
+      while (box.children.length > 7) box.removeChild(box.lastChild);
+    }
+
+    function initChart() {
+      const ctx = document.getElementById('chart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            { label: 'TDS', data: [], borderColor: '#38bdf8', tension: 0.35, fill: false },
+            { label: 'Turb × 20', data: [], borderColor: '#f59e0b', tension: 0.35, fill: false },
+            { label: 'pH × 50', data: [], borderColor: '#22c55e', tension: 0.35, fill: false }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#94a3b8', boxWidth: 10, font: { size: 11 } } } },
+          scales: {
+            x: { ticks: { color: '#64748b', maxTicksLimit: 6, font: { size: 10 } }, grid: { color: '#1e293b' } },
+            y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' }, min: 0 }
+          }
+        }
+      });
+    }
+
+    function pushChart() {
+      const label = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      hist.labels.push(label);
+      hist.turb.push(+(turb * 20).toFixed(1));
+      hist.ph.push(+(ph * 50).toFixed(1));
+      hist.tds.push(tds);
+      if (hist.labels.length > 18) {
+        hist.labels.shift(); hist.turb.shift(); hist.ph.shift(); hist.tds.shift();
+      }
+      chart.data.labels = hist.labels;
+      chart.data.datasets[0].data = hist.tds;
+      chart.data.datasets[1].data = hist.turb;
+      chart.data.datasets[2].data = hist.ph;
+      chart.update('none');
+    }
+
+    function tick() {
+      if (!running || purifying) return;
+      turb = Math.max(0.2, Math.min(28, +(turb + (Math.random() - 0.48) * 0.6).toFixed(1)));
+      ph = Math.max(4.5, Math.min(9.5, +(ph + (Math.random() - 0.5) * 0.12).toFixed(1)));
+      tds = Math.max(30, Math.min(950, Math.round(tds + (Math.random() - 0.48) * 18)));
+      document.getElementById('sliderTurb').value = turb;
+      document.getElementById('sliderPh').value = ph;
+      document.getElementById('sliderTds').value = tds;
+      samples++;
+      if (isSafe()) safeCount++;
+      updateAll();
+      pushChart();
+      if (!isSafe()) {
+        alerts++;
+        tg('Contaminated! TURB ' + turb + ' | pH ' + ph + ' | TDS ' + tds + ' — Starting purification', true);
+        runPurification();
+      } else if (samples % 6 === 0) {
+        tg('All parameters PASS. Water flowing to Clean Tap.');
+      }
+    }
+
+    function toggleSim() {
+      if (running) {
+        running = false;
+        clearInterval(intervalId);
+        document.getElementById('btnSim').innerHTML = '▶ Start Simulation';
+        document.getElementById('playBtn').textContent = '▶';
+        document.getElementById('playBtn').classList.remove('playing');
+        document.getElementById('btnPurify').disabled = true;
+        updateAll();
+        tg('Simulation paused. Water flow stopped.');
+      } else {
+        running = true;
+        document.getElementById('btnSim').innerHTML = '⏸ Pause';
+        document.getElementById('playBtn').textContent = '⏸';
+        document.getElementById('playBtn').classList.add('playing');
+        document.getElementById('btnPurify').disabled = false;
+        tg('Live simulation started. Water is flowing...');
+        updateAll();
+        tick();
+        intervalId = setInterval(tick, 2000);
+      }
+    }
+
+    function runPurification() {
+      if (purifying) return;
+      purifying = true;
+      document.getElementById('btnPurify').disabled = true;
+      updateAll();
+      setStageActive(1);
+      tg('Water diverted through purification chain...');
+
+      let stage = 1;
+      const stageInterval = setInterval(() => {
+        stage++;
+        if (stage <= 5) {
+          setStageActive(stage);
+        } else {
+          clearInterval(stageInterval);
+          turb = +(Math.random() * 1.5 + 0.3).toFixed(1);
+          ph = +(6.9 + Math.random() * 0.6).toFixed(1);
+          tds = Math.round(80 + Math.random() * 120);
+          document.getElementById('sliderTurb').value = turb;
+          document.getElementById('sliderPh').value = ph;
+          document.getElementById('sliderTds').value = tds;
+          purifying = false;
+          setStageActive(6);
+          updateAll();
+          pushChart();
+          tg('✅ Purification complete. Clean water flowing at tap.');
+          document.getElementById('btnPurify').disabled = !running;
+          setTimeout(() => setStageActive(0), 2000);
+        }
+      }, 800);
+    }
+
+    function injectContam() {
+      turb = +(12 + Math.random() * 10).toFixed(1);
+      ph = +(5.0 + Math.random() * 0.8).toFixed(1);
+      tds = Math.round(550 + Math.random() * 250);
+      document.getElementById('sliderTurb').value = turb;
+      document.getElementById('sliderPh').value = ph;
+      document.getElementById('sliderTds').value = tds;
+      updateAll();
+      tg('Contaminated water injected!', true);
+      if (running && !purifying) {
+        alerts++;
+        runPurification();
+      }
+    }
+
+    function resetAll() {
+      running = false;
+      purifying = false;
+      clearInterval(intervalId);
+      turb = 1.8; ph = 7.2; tds = 180;
+      samples = 0; alerts = 0; safeCount = 0;
+      hist = { labels: [], turb: [], ph: [], tds: [] };
+      document.getElementById('sliderTurb').value = turb;
+      document.getElementById('sliderPh').value = ph;
+      document.getElementById('sliderTds').value = tds;
+      document.getElementById('btnSim').innerHTML = '▶ Start Simulation';
+      document.getElementById('playBtn').textContent = '▶';
+      document.getElementById('playBtn').classList.remove('playing');
+      document.getElementById('btnPurify').disabled = true;
+      setStageActive(0);
+      if (chart) {
+        chart.data.labels = [];
+        chart.data.datasets.forEach(d => d.data = []);
+        chart.update();
+      }
+      document.getElementById('tgBox').innerHTML = '<div class="tg-msg"><div class="tg-head"><span>🤖 AquaTitans Bot</span><span class="tg-time">now</span></div>System reset. Ready.</div>';
+      updateAll();
+    }
+
+    window.onload = function() {
+      initChart();
+      updateAll();
+    };
+  </script>
+</body>
+</html>
